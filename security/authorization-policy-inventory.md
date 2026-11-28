@@ -1,6 +1,6 @@
 # API authorization policy inventory
 
-**Status:** Source-derived inventory, reviewed 2026-11-27.  
+**Status:** Source-derived inventory, updated 2026-11-28; persisted role administration is under review in HeapCare.Api PR #157 and is not yet merged.  
 **Purpose:** Provide a traceable starting point for role-based authorization review and authenticated acceptance. This is not a role-to-permission grant matrix and is not a substitute for tests or a live authorization review.
 
 ## Source of truth and trust model
@@ -17,6 +17,7 @@ Every tenant-scoped route group must retain its tenant-scoped endpoint metadata 
 | Facility create/update | `FacilityWrite` | Hospital create/update and corresponding hierarchy writes; `FacilityEndpoints.cs` and sibling hierarchy endpoint groups |
 | Facility delete | `FacilityDelete` | Hospital delete and corresponding hierarchy deletes; `FacilityEndpoints.cs` and sibling hierarchy endpoint groups |
 | Tenant membership administration | `TenantMembershipManage` | Tenant membership management group; `TenantMembershipEndpoints.cs` |
+| Tenant role administration | `TenantMembershipManage` | Tenant role list, delegable permission catalogue, custom role create/update/deactivate/reactivate; `TenantRoleEndpoints.cs`. Service layer restricts role-definition changes to Tenant scope and validates permission delegation. |
 | Platform operator | `PlatformOperator` | Initial-administrator provisioning and platform-operator operations; `TenantMembershipEndpoints.cs` and platform endpoint groups |
 | Patient read | `PatientRead` | Patient search/read operations; `PatientEndpoints.cs` |
 | Patient identity read | `PatientIdentityRead` | Patient identity/detail operations; `PatientEndpoints.cs` |
@@ -78,3 +79,19 @@ Do not treat this inventory as proof of role correctness. Before production/pilo
 ## Latest authorization regression evidence — 2026-11-27
 
 The source-derived role matrix now records the merged API PRs #96–#100. In brief: PR #96 covers hospital/department-scoped patient identifier denial; PR #97 covers OPD encounter denials for FacilityManager, FacilityViewer and PatientRegistrar; PR #98 adds FacilityManager scheduling/billing denials and patient search/registration denials for FacilityManager/FacilityViewer; PR #99 explicitly denies HospitalAdmin OPD encounter access; and PR #100 verifies hospital/department-scoped HospitalAdmin cannot query/export tenant-wide audit data. These are targeted regression tests, not an exhaustive authorization certification. The next review must compare every current endpoint registration and service/persistence scope guard with the latest HeapCare.Api source and preserve the distinction between policy-level and resource-level authorization.
+
+
+## Persisted role-administration routes — PR #157 (not yet merged)
+
+The proposed tenant role API is registered under the existing authenticated tenant-scoped route metadata and the `TenantMembershipManage` policy:
+
+| Operation | Route | Endpoint name |
+|---|---|---|
+| List roles visible to the actor | `GET /api/v1/tenant/roles` | `ListTenantRoles` |
+| List permission definitions the actor may delegate | `GET /api/v1/tenant/roles/permissions` | `ListAssignableTenantRolePermissions` |
+| Create a custom role | `POST /api/v1/tenant/roles` | `CreateTenantRole` |
+| Update a custom role | `PUT /api/v1/tenant/roles/{roleId}` | `UpdateTenantRole` |
+| Deactivate a custom role | `POST /api/v1/tenant/roles/{roleId}/deactivate` | `DeactivateTenantRole` |
+| Reactivate a custom role | `POST /api/v1/tenant/roles/{roleId}/reactivate` | `ReactivateTenantRole` |
+
+The endpoint policy is only the first authorization layer. The administration service additionally requires Tenant scope for role-definition changes, rejects non-assignable or unknown permission codes, enforces custom-role grant-subset delegation, protects system roles and appends a before/after audit snapshot with a required reason. These routes are part of open PR #157, not the current `main` endpoint surface.
